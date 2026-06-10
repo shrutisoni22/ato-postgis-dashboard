@@ -1,0 +1,183 @@
+/* PostGIS dashboard overrides.
+   The base layout comes from style.css so this page stays visually aligned with
+   the normal dashboard while using database-backed data. */
+
+body.postgis-dashboard {
+    background: var(--bg);
+}
+
+.postgis-hidden-control {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.postgis-api-card {
+    flex: 1;
+    min-width: 260px;
+}
+
+#apiStatus {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.postgis-panel {
+    display: block;
+}
+
+.postgis-panel label {
+    margin-top: 12px;
+}
+
+.postgis-panel select {
+    width: 100%;
+}
+
+.postgis-panel .btn {
+    width: 100%;
+    margin-top: 14px;
+}
+
+.postgis-summary-box {
+    margin-bottom: 4px;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.metric-card {
+    padding: 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-soft);
+}
+
+.metric-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.metric-value {
+    margin-top: 3px;
+    color: var(--navy);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+#featureTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+#featureTable th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 8px 10px;
+    border-right: 1px solid rgba(255, 255, 255, 0.18);
+    background: var(--navy-mid);
+    color: #ffffff;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+#featureTable th:last-child {
+    border-right: none;
+}
+
+#featureTable td {
+    padding: 7px 10px;
+    border-right: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--text);
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+#featureTable tbody tr:nth-child(even) {
+    background: var(--surface-soft);
+}
+
+#featureTable tbody tr:hover {
+    background: var(--blue-muted);
+}
+
+.port-dashboard-active #dashboardMainTitle {
+    color: var(--navy);
+}
+
+.port-dashboard-active .road-only-control {
+    display: none;
+}
+
+.postgis-dashboard .leaflet-control-zoom {
+    display: none;
+}
+
+@media (max-width: 1100px) {
+    html,
+    body {
+        overflow: auto;
+    }
+
+    #dashboardShell {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+    }
+
+    #dashboardBody {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 55vh auto;
+        overflow: visible;
+    }
+
+    #brandRail,
+    #mapColumn,
+    #sidebar {
+        grid-column: 1;
+    }
+
+    #brandRail {
+        display: none;
+    }
+
+    .postgis-dashboard .dashboard-mode-switch {
+        display: inline-flex;
+    }
+
+    .postgis-dashboard #dashboardActions {
+        flex-wrap: wrap;
+    }
+
+    #mapColumn {
+        grid-row: 1;
+        grid-template-rows: minmax(360px, 55vh) auto;
+    }
+
+    #sidebar {
+        grid-row: 2;
+        max-height: none;
+    }
+
+    .postgis-api-card {
+        min-width: 100%;
+    }
+}

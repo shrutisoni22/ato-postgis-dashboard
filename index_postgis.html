@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transport Infrastructure Hazard Dashboard - PostGIS</title>
+
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style_postgis.css?v=20260609_same_controls_2" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+
+<body class="road-dashboard-active postgis-dashboard">
+    <div id="dashboardShell">
+        <!-- ===== DASHBOARD HEADER ===== -->
+        <header id="dashboardHeader">
+            <div id="dashboardTitleBlock" class="dashboard-title-with-logo">
+                <img class="dashboard-header-logo" src="ato_logo.png" alt="ATO logo" />
+                <div>
+                    <div class="dashboard-kicker">Asian Transport Observatory</div>
+                    <h1 id="dashboardMainTitle">The Road Infrastructure Hazard Dashboard</h1>
+                    <p id="dashboardMainSubtitle">Multi-hazard exposure analysis for roads</p>
+                </div>
+            </div>
+
+            <div id="dashboardActions">
+                <div id="dashboardModeSwitch" class="dashboard-mode-switch" aria-label="Dashboard switcher">
+                    <button id="roadDashboardButton" class="dashboard-mode-btn active" type="button" data-dashboard-mode="roads">Road Dashboard</button>
+                    <button id="portDashboardButton" class="dashboard-mode-btn" type="button" data-dashboard-mode="ports">Port Area Dashboard</button>
+                </div>
+                <button id="resetViewButton" class="header-action-btn" type="button">Reset</button>
+            </div>
+
+            <div id="topFilterStrip">
+                <div class="top-filter-card">
+                    <div class="top-filter-label">Active Layer</div>
+                    <div id="activeLayerLabel" class="top-filter-value">Flood Exposure</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ===== DASHBOARD BODY ===== -->
+        <main id="dashboardBody">
+            <!-- LEFT BRAND / INFO RAIL -->
+            <aside id="brandRail">
+                <div class="ato-card ato-card-real-logo">
+                    <img class="ato-real-logo" src="ato_logo.png" alt="Asian Transport Observatory logo" />
+                    <div class="ato-logo-text">Asian<br>Transport<br>Observatory</div>
+                </div>
+
+                <div class="rail-note">
+                    <b id="railContextTitle">Road Exposure</b><br>
+                    <span id="railContextDescription">View flood, landslide, cyclone and seismic exposure outputs generated from the Python workflow.</span>
+                </div>
+
+                <div class="rail-step-card">
+                    <div class="rail-step-number">1</div>
+                    <div>Select hazard and filters.</div>
+                </div>
+                <div class="rail-step-card">
+                    <div class="rail-step-number">2</div>
+                    <div>Load scenario output.</div>
+                </div>
+                <div class="rail-step-card">
+                    <div class="rail-step-number">3</div>
+                    <div>Inspect map, summary and table.</div>
+                </div>
+            </aside>
+
+            <!-- MAP + BOTTOM TABLE COLUMN: extends behind the floating right control panel -->
+            <section id="mapColumn">
+                <section id="mapPanel" class="dashboard-card">
+                    <div id="map"></div>
+                    <div id="mapFloatingToolbar">
+                        <button id="mapZoomInButton" type="button" title="Zoom in" aria-label="Zoom in">＋</button>
+                        <button id="mapZoomOutButton" type="button" title="Zoom out" aria-label="Zoom out">－</button>
+                    </div>
+                    <div id="mapAttributionNote">OpenStreetMap basemap &nbsp;|&nbsp; Dashboard generated from precomputed hazard exposure layers</div>
+                </section>
+
+                <section id="bottomPanel" class="dashboard-card">
+                    <div id="bottomPanelHeader">
+                        <div>
+                            <h2 id="bottomTableTitle">Detailed Exposure Table</h2>
+                            <p id="bottomTableSubtitle">Load a hazard scenario to view road exposure records.</p>
+                        </div>
+                        <div id="bottomTableMeta">Ready</div>
+                    </div>
+
+                    <div id="bottomTableWrapper">
+                        <table id="detailedExposureTable">
+                            <thead>
+                                <tr>
+                                    <th>Hazard</th>
+                                    <th>Road Category</th>
+                                    <th>Scenario</th>
+                                    <th>Exposed Length</th>
+                                    <th>Exposed Count</th>
+                                    <th>Maximum Hazard Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="empty-table-cell">No scenario loaded yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="bottomTabBar">
+                        <button type="button" class="bottom-tab active" data-bottom-tab="flood">Detailed Flood Exposure</button>
+                        <button type="button" class="bottom-tab" data-bottom-tab="landslide">Landslide Exposure</button>
+                        <button type="button" class="bottom-tab" data-bottom-tab="cyclone">Cyclone Exposure</button>
+                        <button type="button" class="bottom-tab" data-bottom-tab="seismic">Seismic Exposure</button>
+                    </div>
+                </section>
+            </section>
+
+            <!-- RIGHT CONTROL + SUMMARY SIDEBAR: floating overlay, like Experience Builder side panel -->
+            <div id="sidebar">
+
+            <!-- ========================================
+                 FLOOD PANEL
+                 ======================================== -->
+            <div id="panel-flood" class="hazard-panel">
+                <p class="subtitle">
+                    Dashboard using precomputed Python road-flood exposure outputs.
+                </p>
+
+                <label>Country Boundary Filter</label>
+                <select id="countryFilter" class="country-filter-select">
+                    <option value="">Loading country boundaries...</option>
+                </select>
+                <div id="countryBoundaryStatus" class="country-boundary-status">
+                    Place individual country boundary GeoJSON files in <code>data/</code>, for example <code>data/Fiji.geojson</code>. A combined file is optional.
+                </div>
+
+                <label>Road Category</label>
+                <select id="roadCategory">
+                    <option value="Primary">Primary</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Tertiary">Tertiary</option>
+                </select>
+
+                <label>Flood Dataset</label>
+                <select id="floodDataset">
+                    <option value="flood">Flood</option>
+                    <option value="flood_ii">Flood-II (Deltares)</option>
+                </select>
+
+                <label class="flood-original-control">Flood Type</label>
+                <select id="floodType" class="flood-original-control">
+                    <option value="inuncoast">Coastal Flooding</option>
+                    <option value="inunriver">River Flooding</option>
+                </select>
+
+                <label>Return Period</label>
+                <select id="returnPeriod">
+                    <option value="10">10 years</option>
+                    <option value="100">100 years</option>
+                </select>
+
+                <label class="flood-ii-control hidden">Flood-II Source</label>
+                <select id="floodIIDataset" class="flood-ii-control hidden">
+                    <option value="LIDAR-5km">LIDAR 5 km</option>
+                    <option value="MERITDEM-1km">MERITDEM 1 km</option>
+                    <option value="MERITDEM-90m">MERITDEM 90 m</option>
+                    <option value="NASADEM-1km">NASADEM 1 km</option>
+                    <option value="NASADEM-90m">NASADEM 90 m</option>
+                </select>
+
+                <label class="flood-ii-control hidden">Flood-II Year</label>
+                <select id="floodIIYear" class="flood-ii-control hidden">
+                    <option value="2018">2018</option>
+                    <option value="2050">2050</option>
+                </select>
+
+                <label class="flood-original-control">Epoch</label>
+                <select id="epoch" class="flood-original-control">
+                    <option value="Present">Present</option>
+                    <option value="2030">2030</option>
+                    <option value="2050">2050</option>
+                    <option value="2080">2080</option>
+                </select>
+
+                <label class="flood-original-control">Climate Scenario</label>
+                <select id="scenario" class="flood-original-control">
+                    <option value="historical">Historical</option>
+                    <option value="rcp4p5">RCP 4.5</option>
+                    <option value="rcp8p5">RCP 8.5</option>
+                </select>
+
+                <label class="flood-original-control">GCM</label>
+                <select id="gcm" class="flood-original-control">
+                    <option value="NA">NA</option>
+                    <option value="WATCH">WATCH</option>
+                    <option value="GFDL_ESM2M">GFDL-ESM2M</option>
+                    <option value="HadGEM2_ES">HadGEM2-ES</option>
+                    <option value="IPSL_CM5A_LR">IPSL-CM5A-LR</option>
+                    <option value="MIROC_ESM_CHEM">MIROC-ESM-CHEM</option>
+                    <option value="NorESM1_M">NorESM1-M</option>
+                </select>
+
+                <button id="loadButton" class="btn btn-flood">Load Scenario</button>
+
+                <div id="statusBox" class="status-box">Ready.</div>
+
+                <div id="floodTileBox" class="info-box tile-control-box">
+                    <h3>Raster Tile Layer</h3>
+
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="showFloodRaster" checked />
+                        <span>Show matching flood raster tiles</span>
+                    </label>
+
+                    <label for="floodTileOpacity">Raster opacity</label>
+                    <input
+                        type="range"
+                        id="floodTileOpacity"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value="0.65"
+                    />
+
+                    <div id="floodTileStatus" class="tile-status">
+                        Raster tiles will load with the selected scenario.
+                    </div>
+                </div>
+
+                <div id="summaryBox" class="info-box">
+                    <h3>Road Exposure Summary</h3>
+                    <p>Select a scenario and click Load Scenario.</p>
+                </div>
+
+                <div id="floodChartBox" class="info-box chart-card hidden">
+                    <h3>Flood Exposure Graph</h3>
+                    <canvas id="floodChart"></canvas>
+                    <p class="chart-caption">
+                        Percentage of total road length exposed by road category for the selected flood scenario.
+                    </p>
+                </div>
+
+                <div id="legendBox" class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch" style="background:#e53935;"></span>
+                        Exposed roads (Flood)
+                    </div>
+                    <div class="legend-row" style="margin-top:8px;">
+                        <span class="legend-raster-ramp"></span>
+                        Flood raster depth tiles
+                    </div>
+                    <p class="legend-note">
+                        Raster tiles use the color ramp created in the TIFF-to-tiles Python workflow.
+                    </p>
+                </div>
+            </div>
+            <!-- /panel-flood -->
+
+
+            <!-- ========================================
+                 LANDSLIDE PANEL
+                 ======================================== -->
+            <div id="panel-landslide" class="hazard-panel hidden">
+                <p class="subtitle">
+                    Landslide road exposure using LS_TH_COG raster &mdash;
+                    hazard value &ge; 3 (High &amp; Very High).
+                </p>
+
+                <label>Road Category</label>
+                <select id="lsRoadCategory">
+                    <option value="All">All Categories</option>
+                    <option value="Primary">Primary</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Tertiary">Tertiary</option>
+                </select>
+
+                <button id="lsLoadButton" class="btn btn-landslide">
+                    Load Landslide Exposure
+                </button>
+
+                <div id="lsStatusBox" class="status-box ls-status-box">Ready.</div>
+
+                <div id="lsSummaryBox" class="info-box">
+                    <h3>Landslide Exposure Summary</h3>
+                    <p>Select a road category and click Load.</p>
+                </div>
+
+                <div id="lsChartBox" class="info-box hidden">
+                    <h3>Exposed Road Length by Category</h3>
+                    <canvas id="lsChart"></canvas>
+                    <p class="chart-caption">Percentage of total road length exposed to high/very high landslide hazard.
+                    </p>
+                </div>
+
+                <div id="lsLegendBox" class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch" style="background:#c62828;"></span>
+                        Very High hazard (value = 4)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch" style="background:#ef6c00;"></span>
+                        High hazard (value = 3)
+                    </div>
+                </div>
+            </div>
+            <!-- /panel-landslide -->
+
+
+            <!-- ========================================
+                 CYCLONE PANEL
+                 ======================================== -->
+            <div id="panel-cyclone" class="hazard-panel hidden">
+                <p class="subtitle">
+                    Cyclone road exposure using precomputed wind-speed outputs &mdash;
+                    High, Very High and Extreme exposure classes.
+                </p>
+
+                <label>Country Boundary Filter</label>
+                <select id="cyCountryFilter" class="country-filter-select">
+                    <option value="">Loading country boundaries...</option>
+                </select>
+                <div id="cyCountryBoundaryStatus" class="country-boundary-status">
+                    Select a country to zoom to it. The boundary will be used for zoom only and will not be displayed.
+                </div>
+
+                <label>Road Category</label>
+                <select id="cyRoadCategory">
+                    <option value="All">All Categories</option>
+                    <option value="Primary">Primary</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Tertiary">Tertiary</option>
+                </select>
+
+                <label>Climate / Wind Model</label>
+                <select id="cyModel">
+                    <option value="CMCC-CM2-VHR4">CMCC-CM2-VHR4</option>
+                    <option value="CNRM-CM6-1-HR">CNRM-CM6-1-HR</option>
+                    <option value="constant">Constant</option>
+                    <option value="EC-Earth3P-HR">EC-Earth3P-HR</option>
+                    <option value="HadGEM3-GC31-HM">HadGEM3-GC31-HM</option>
+                    <option value="All">All Models</option>
+                </select>
+
+                <label>Return Period</label>
+                <select id="cyReturnPeriod">
+                    <option value="10">10 years</option>
+                    <option value="100">100 years</option>
+                </select>
+
+                <label>Exposure Class</label>
+                <select id="cyExposureClass">
+                    <option value="All">All Classes</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                    <option value="Extreme">Extreme</option>
+                </select>
+
+                <button id="cyLoadButton" class="btn btn-cyclone">
+                    Load Cyclone Exposure
+                </button>
+
+                <div id="cyStatusBox" class="status-box cy-status-box">Ready.</div>
+
+                <div id="cySummaryBox" class="info-box">
+                    <h3>Cyclone Exposure Summary</h3>
+                    <p>Select a scenario and click Load Cyclone Exposure.</p>
+                </div>
+
+                <div id="cyChartBox" class="info-box hidden">
+                    <h3>Exposed Road Length by Category</h3>
+                    <canvas id="cyChart"></canvas>
+                    <p class="chart-caption">
+                        Percentage of total road length exposed to selected cyclone wind category.
+                    </p>
+                </div>
+
+                <div id="cyLegendBox" class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch legend-high"></span>
+                        High cyclone wind exposure (&ge; 24.7 m/s)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-very-high"></span>
+                        Very High cyclone wind exposure (&ge; 32.9 m/s)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-extreme"></span>
+                        Extreme cyclone wind exposure (&ge; 49.4 m/s)
+                    </div>
+                </div>
+            </div>
+            <!-- /panel-cyclone -->
+
+
+            <!-- ========================================
+                 SEISMIC PANEL
+                 ======================================== -->
+            <div id="panel-seismic" class="hazard-panel hidden">
+                <p class="subtitle">
+                    Seismic road exposure using PGA hazard outputs &mdash;
+                    High, Very High and Extreme exposure classes.
+                </p>
+
+                <label>Country Boundary Filter</label>
+                <select id="seCountryFilter" class="country-filter-select">
+                    <option value="">Loading country boundaries...</option>
+                </select>
+                <div id="seCountryBoundaryStatus" class="country-boundary-status">
+                    Select a country to zoom to it. The boundary will be used for zoom only and will not be displayed.
+                </div>
+
+                <label>Road Category</label>
+                <select id="seRoadCategory">
+                    <option value="All">All Categories</option>
+                    <option value="Primary">Primary</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Tertiary">Tertiary</option>
+                </select>
+
+                <label>Return Period</label>
+                <select id="seReturnPeriod">
+                    <option value="475">475 years</option>
+                </select>
+
+                <label>Exposure Class</label>
+                <select id="seExposureClass">
+                    <option value="All">All Classes</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                    <option value="Extreme">Extreme</option>
+                </select>
+
+                <button id="seLoadButton" class="btn btn-seismic">
+                    Load Seismic Exposure
+                </button>
+
+                <div id="seStatusBox" class="status-box se-status-box">Ready.</div>
+
+                <div id="seSummaryBox" class="info-box">
+                    <h3>Seismic Exposure Summary</h3>
+                    <p>Select a scenario and click Load Seismic Exposure.</p>
+                </div>
+
+                <div id="seChartBox" class="info-box hidden">
+                    <h3>Exposed Road Length by Category</h3>
+                    <canvas id="seChart"></canvas>
+                    <p class="chart-caption">
+                        Percentage of total road length exposed to selected seismic PGA category.
+                    </p>
+                </div>
+
+                <div id="seLegendBox" class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch legend-high"></span>
+                        High seismic exposure (&ge; 0.20 g)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-very-high"></span>
+                        Very High seismic exposure (&ge; 0.40 g)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-extreme"></span>
+                        Extreme seismic exposure (&ge; 0.60 g)
+                    </div>
+                </div>
+            </div>
+            <!-- /panel-seismic -->
+
+            <!-- ========================================
+                 PORT DASHBOARD: FLOOD PANEL
+                 ======================================== -->
+            <div id="port-panel-flood" class="hazard-panel hidden port-hazard-panel">
+                <p class="subtitle port-subtitle">
+                    Port area flood exposure dashboard using country-wise exposed port polygon outputs generated from the Python workflow.
+                </p>
+
+                <label>Country Filter</label>
+                <select id="portCountryFilter" class="country-filter-select">
+                    <option value="">Loading country list...</option>
+                </select>
+                <div id="portCountryBoundaryStatus" class="country-boundary-status">
+                    The country list is loaded only from exposed-port output files. Recommended manifest: <code>data/port_flood/exposed_ports_by_country/port_countries.json</code>.
+                </div>
+
+                <label>Flood Dataset</label>
+                <select id="portFloodDataset">
+                    <option value="flood">Flood</option>
+                    <option value="flood_ii">Flood-II (Deltares)</option>
+                </select>
+
+                <label class="port-flood-original-control">Flood Type Filter</label>
+                <select id="portFloodType" class="port-flood-original-control">
+                    <option value="All">All Flood Types</option>
+                    <option value="inuncoast">Coastal Flooding</option>
+                    <option value="inunriver">River Flooding</option>
+                </select>
+
+                <label>Return Period Filter</label>
+                <select id="portReturnPeriod">
+                    <option value="All">All Return Periods</option>
+                    <option value="10">10 years</option>
+                    <option value="100">100 years</option>
+                </select>
+
+                <button id="portLoadButton" class="btn btn-port-flood">Load Exposed Port Areas</button>
+
+                <div id="portStatusBox" class="status-box port-status-box">Ready.</div>
+
+                <div id="portSummaryBox" class="info-box">
+                    <h3>Port Area Flood Exposure Summary</h3>
+                    <p>Select a country and click Load Exposed Port Areas.</p>
+                </div>
+
+                <div id="portChartBox" class="info-box chart-card hidden">
+                    <h3>Top Exposed Port Areas</h3>
+                    <canvas id="portChart"></canvas>
+                    <p class="chart-caption">
+                        Ranking uses the maximum flood value recorded inside each exposed port polygon.
+                    </p>
+                </div>
+
+                <div id="portLegendBox" class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch legend-port-flood"></span>
+                        Exposed port area polygons
+                    </div>
+                    <p class="legend-note">
+                        Expected files can be kept in <code>data/port_flood/exposed_ports_by_country/</code>. Generate <code>port_countries.json</code> so the dropdown shows only countries with exposed-port files.
+                    </p>
+                </div>
+            </div>
+            <!-- /port-panel-flood -->
+
+            <!-- ========================================
+                 PORT DASHBOARD: LANDSLIDE PANEL
+                 ======================================== -->
+            <div id="port-panel-landslide" class="hazard-panel hidden port-hazard-panel">
+                <p class="subtitle port-subtitle">
+                    Port area landslide exposure using country-wise exposed port polygon outputs generated from the Python workflow.
+                </p>
+
+                <label>Country Filter</label>
+                <select id="portLandslideCountryFilter" class="port-country-select">
+                    <option value="">Loading country list...</option>
+                </select>
+                <div id="portLandslideCountryStatus" class="country-boundary-status">
+                    Expected manifest: <code>data/port_landslide/exposed_ports_by_country/port_countries.json</code>.
+                </div>
+
+                <label>Landslide Class Filter</label>
+                <select id="portLandslideClassFilter">
+                    <option value="All">All exposed classes</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                </select>
+
+                <button id="portLandslideLoadButton" class="btn btn-port-landslide">Load Exposed Port Areas</button>
+
+                <div id="portLandslideStatusBox" class="status-box port-status-box">Ready.</div>
+
+                <div id="portLandslideSummaryBox" class="info-box port-hazard-summary-box">
+                    <h3>Port Area Landslide Exposure Summary</h3>
+                    <p>Select a country and click Load Exposed Port Areas.</p>
+                </div>
+
+                <div id="portLandslideChartBox" class="info-box chart-card hidden">
+                    <h3>Top Exposed Port Areas</h3>
+                    <canvas id="portLandslideChart"></canvas>
+                    <p class="chart-caption">
+                        Ranking uses the maximum landslide class value recorded inside each exposed port polygon.
+                    </p>
+                </div>
+
+                <div class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch legend-port-landslide-high"></span>
+                        High landslide exposure (value = 3)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-port-landslide-very-high"></span>
+                        Very High landslide exposure (value = 4)
+                    </div>
+                    <p class="legend-note">
+                        Files are read from <code>data/port_landslide/exposed_ports_by_country/</code>.
+                    </p>
+                </div>
+            </div>
+            <!-- /port-panel-landslide -->
+
+            <!-- ========================================
+                 PORT DASHBOARD: CYCLONE PANEL
+                 ======================================== -->
+            <div id="port-panel-cyclone" class="hazard-panel hidden port-hazard-panel">
+                <p class="subtitle port-subtitle">
+                    Port area cyclone exposure using country-wise exposed port polygon outputs generated from the Python workflow.
+                </p>
+
+                <label>Country Filter</label>
+                <select id="portCycloneCountryFilter" class="port-country-select">
+                    <option value="">Loading country list...</option>
+                </select>
+                <div id="portCycloneCountryStatus" class="country-boundary-status">
+                    Expected manifest: <code>data/port_cyclone/exposed_ports_by_country/port_countries.json</code>.
+                </div>
+
+                <label>Cyclone Class Filter</label>
+                <select id="portCycloneClassFilter">
+                    <option value="All">All exposed classes</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                    <option value="Extreme">Extreme</option>
+                </select>
+
+                <button id="portCycloneLoadButton" class="btn btn-port-cyclone">Load Exposed Port Areas</button>
+
+                <div id="portCycloneStatusBox" class="status-box port-status-box">Ready.</div>
+
+                <div id="portCycloneSummaryBox" class="info-box port-hazard-summary-box">
+                    <h3>Port Area Cyclone Exposure Summary</h3>
+                    <p>Select a country and click Load Exposed Port Areas.</p>
+                </div>
+
+                <div id="portCycloneChartBox" class="info-box chart-card hidden">
+                    <h3>Top Exposed Port Areas</h3>
+                    <canvas id="portCycloneChart"></canvas>
+                    <p class="chart-caption">
+                        Ranking uses the maximum cyclone wind speed recorded inside each exposed port polygon.
+                    </p>
+                </div>
+
+                <div class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch legend-port-cyclone-high"></span>
+                        High cyclone exposure (&ge; 24.7 m/s)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-port-cyclone-very-high"></span>
+                        Very High cyclone exposure (&ge; 32.9 m/s)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-port-cyclone-extreme"></span>
+                        Extreme cyclone exposure (&ge; 49.4 m/s)
+                    </div>
+                    <p class="legend-note">
+                        Files are read from <code>data/port_cyclone/exposed_ports_by_country/</code>.
+                    </p>
+                </div>
+            </div>
+            <!-- /port-panel-cyclone -->
+
+            <!-- ========================================
+                 PORT DASHBOARD: SEISMIC PANEL
+                 ======================================== -->
+            <div id="port-panel-seismic" class="hazard-panel hidden port-hazard-panel">
+                <p class="subtitle port-subtitle">
+                    Port area seismic exposure using country-wise exposed port polygon outputs generated from the Python workflow.
+                </p>
+
+                <label>Country Filter</label>
+                <select id="portSeismicCountryFilter" class="port-country-select">
+                    <option value="">Loading country list...</option>
+                </select>
+                <div id="portSeismicCountryStatus" class="country-boundary-status">
+                    Expected manifest: <code>data/port_seismic/exposed_ports_by_country/port_countries.json</code>.
+                </div>
+
+                <label>Seismic Class Filter</label>
+                <select id="portSeismicClassFilter">
+                    <option value="All">All exposed classes</option>
+                    <option value="High">High</option>
+                    <option value="Very High">Very High</option>
+                    <option value="Extreme">Extreme</option>
+                </select>
+
+                <button id="portSeismicLoadButton" class="btn btn-port-seismic">Load Exposed Port Areas</button>
+
+                <div id="portSeismicStatusBox" class="status-box port-status-box">Ready.</div>
+
+                <div id="portSeismicSummaryBox" class="info-box port-hazard-summary-box">
+                    <h3>Port Area Seismic Exposure Summary</h3>
+                    <p>Select a country and click Load Exposed Port Areas.</p>
+                </div>
+
+                <div id="portSeismicChartBox" class="info-box chart-card hidden">
+                    <h3>Top Exposed Port Areas</h3>
+                    <canvas id="portSeismicChart"></canvas>
+                    <p class="chart-caption">
+                        Ranking uses the maximum seismic PGA value recorded inside each exposed port polygon.
+                    </p>
+                </div>
+
+                <div class="info-box">
+                    <h3>Legend</h3>
+                    <div class="legend-row">
+                        <span class="legend-swatch legend-port-seismic-high"></span>
+                        High seismic exposure (&ge; 0.20 g)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-port-seismic-very-high"></span>
+                        Very High seismic exposure (&ge; 0.40 g)
+                    </div>
+                    <div class="legend-row" style="margin-top:6px;">
+                        <span class="legend-swatch legend-port-seismic-extreme"></span>
+                        Extreme seismic exposure (&ge; 0.60 g)
+                    </div>
+                    <p class="legend-note">
+                        Files are read from <code>data/port_seismic/exposed_ports_by_country/</code>.
+                    </p>
+                </div>
+            </div>
+            <!-- /port-panel-seismic -->
+
+        </div>
+        <!-- /sidebar -->
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="main_postgis.js?v=20260610_lan_access"></script>
+
+</body>
+
+</html>

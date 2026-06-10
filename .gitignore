@@ -1,0 +1,29 @@
+# Python/local environment
+__pycache__/
+*.py[cod]
+.venv/
+.venv_postgis/
+.env
+
+# Large local GIS/data outputs used for processing/import
+data/
+ROADS/
+Floods_2/
+Cyclone TIFF/
+*.tif
+*.tiff
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.gpkg
+*.geojson
+
+# Large archives and generated bundles
+*.zip
+*.rar
+tiles/
+
+# Local notebook checkpoints
+.ipynb_checkpoints/
