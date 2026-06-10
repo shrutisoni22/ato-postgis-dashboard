@@ -2,6 +2,7 @@ services:
   - type: web
     name: ato-dashboard-postgis
     runtime: python
+    plan: free
     rootDir: backend_postgis
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
@@ -13,5 +14,6 @@ services:
 
 databases:
   - name: ato-dashboard-db
+    plan: free
     databaseName: ato_dashboard
     user: ato
